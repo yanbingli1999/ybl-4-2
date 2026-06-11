@@ -1,5 +1,6 @@
 let fitChart = null;
 let residualChart = null;
+let scChart = null;
 let currentResultId = null;
 let currentDatasetId = null;
 let isDirty = false;
@@ -593,13 +594,414 @@ function initEventListeners() {
   document.getElementById('datasetName').addEventListener('input', markDirty);
 }
 
+function initPageNav() {
+  const navBtns = document.querySelectorAll('.nav-btn');
+  navBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const page = btn.dataset.page;
+      navBtns.forEach(b => b.classList.toggle('active', b.dataset.page === page));
+      document.querySelector('.main-layout:not(.quantification-page)').style.display = page === 'fitting' ? '' : 'none';
+      document.getElementById('quantificationPage').style.display = page === 'quantification' ? '' : 'none';
+      if (page === 'quantification' && !scChart) {
+        initScChart();
+      }
+    });
+  });
+}
+
+function initScChart() {
+  const ctx = document.getElementById('scChart').getContext('2d');
+  scChart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: '标准品',
+          data: [],
+          backgroundColor: '#10b981',
+          borderColor: '#10b981',
+          pointRadius: 7,
+          pointHoverRadius: 9,
+          showLine: false
+        },
+        {
+          label: '拟合直线',
+          data: [],
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderWidth: 3,
+          pointRadius: 0,
+          showLine: true,
+          tension: 0,
+          fill: false
+        },
+        {
+          label: '未知样本',
+          data: [],
+          backgroundColor: '#3b82f6',
+          borderColor: '#3b82f6',
+          pointRadius: 8,
+          pointStyle: 'rectRot',
+          showLine: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(30, 41, 59, 0.95)',
+          titleFont: { size: 13 },
+          bodyFont: { size: 12 },
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            label: (context) => {
+              const x = context.parsed.x?.toFixed(4) || 0;
+              const y = context.parsed.y?.toFixed(4) || 0;
+              if (context.datasetIndex === 2) {
+                return `浓度=${x}, 响应值=${y}`;
+              }
+              return `(${x}, ${y})`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          position: 'bottom',
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: { font: { size: 12 }, color: '#64748b' },
+          title: { display: true, text: '浓度', font: { size: 13, weight: '600' }, color: '#475569' }
+        },
+        y: {
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: { font: { size: 12 }, color: '#64748b' },
+          title: { display: true, text: '响应值', font: { size: 13, weight: '600' }, color: '#475569' }
+        }
+      }
+    }
+  });
+}
+
+function addStdRow(concentration = '', response = '') {
+  const tbody = document.getElementById('stdTableBody');
+  const rowIndex = tbody.children.length + 1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${rowIndex}</td>
+    <td><input type="number" step="any" class="conc-input" value="${concentration}" placeholder="浓度"></td>
+    <td><input type="number" step="any" class="resp-input" value="${response}" placeholder="响应值"></td>
+    <td><button class="delete-row-btn" title="删除">✕</button></td>
+  `;
+  tr.querySelector('.delete-row-btn').addEventListener('click', () => {
+    tr.remove();
+    updateStdRowNumbers();
+  });
+  tbody.appendChild(tr);
+}
+
+function updateStdRowNumbers() {
+  const tbody = document.getElementById('stdTableBody');
+  Array.from(tbody.children).forEach((tr, idx) => {
+    tr.querySelector('td:first-child').textContent = idx + 1;
+  });
+}
+
+function addUnkRow(name = '', response = '') {
+  const tbody = document.getElementById('unkTableBody');
+  const rowIndex = tbody.children.length + 1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${rowIndex}</td>
+    <td><input type="text" class="name-input" value="${name}" placeholder="样本名"></td>
+    <td><input type="number" step="any" class="resp-input" value="${response}" placeholder="响应值"></td>
+    <td><button class="delete-row-btn" title="删除">✕</button></td>
+  `;
+  tr.querySelector('.delete-row-btn').addEventListener('click', () => {
+    tr.remove();
+    updateUnkRowNumbers();
+  });
+  tbody.appendChild(tr);
+}
+
+function updateUnkRowNumbers() {
+  const tbody = document.getElementById('unkTableBody');
+  Array.from(tbody.children).forEach((tr, idx) => {
+    tr.querySelector('td:first-child').textContent = idx + 1;
+  });
+}
+
+function getStandardsData() {
+  const tbody = document.getElementById('stdTableBody');
+  const standards = [];
+  Array.from(tbody.children).forEach(tr => {
+    const concInput = tr.querySelector('.conc-input');
+    const respInput = tr.querySelector('.resp-input');
+    const concentration = parseFloat(concInput.value);
+    const response = parseFloat(respInput.value);
+    if (!isNaN(concentration) && !isNaN(response)) {
+      standards.push({ concentration, response });
+    }
+  });
+  return standards;
+}
+
+function getUnknownsData() {
+  const tbody = document.getElementById('unkTableBody');
+  const unknowns = [];
+  Array.from(tbody.children).forEach((tr, idx) => {
+    const nameInput = tr.querySelector('.name-input');
+    const respInput = tr.querySelector('.resp-input');
+    const name = nameInput.value.trim() || `样本${idx + 1}`;
+    const response = parseFloat(respInput.value);
+    unknowns.push({ name, response });
+  });
+  return unknowns;
+}
+
+function loadStdSampleData() {
+  const tbody = document.getElementById('stdTableBody');
+  tbody.innerHTML = '';
+  const stdSamples = [
+    { concentration: 0, response: 0.05 },
+    { concentration: 5, response: 0.52 },
+    { concentration: 10, response: 1.01 },
+    { concentration: 20, response: 2.05 },
+    { concentration: 40, response: 3.95 },
+    { concentration: 80, response: 8.10 }
+  ];
+  stdSamples.forEach(s => addStdRow(s.concentration, s.response));
+
+  const unkTbody = document.getElementById('unkTableBody');
+  unkTbody.innerHTML = '';
+  const unkSamples = [
+    { name: 'Sample-A', response: 1.55 },
+    { name: 'Sample-B', response: 3.20 },
+    { name: 'Sample-C', response: 6.80 },
+    { name: 'Sample-D', response: 0.28 }
+  ];
+  unkSamples.forEach(u => addUnkRow(u.name, u.response));
+
+  document.getElementById('scBatchName').value = 'ELISA定量批次';
+  showToast('已加载示例标准品与样本数据', 'success');
+}
+
+async function calculateConcentrations() {
+  const standards = getStandardsData();
+  const unknowns = getUnknownsData();
+  const batchName = document.getElementById('scBatchName').value || '未命名批次';
+
+  if (standards.length < 2) {
+    showToast('请至少录入2个有效标准品数据', 'error');
+    return;
+  }
+  if (unknowns.length === 0) {
+    showToast('请至少录入1个未知样本', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('calcConcBtn');
+  const originalText = btn.textContent;
+  btn.textContent = '⏳ 计算中...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/standard-curve/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ standards, unknowns, batchName })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '计算失败');
+
+    displayScResult(data);
+    loadScBatches();
+    showToast('浓度计算完成，批次已保存！', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
+function displayScResult(batch) {
+  document.getElementById('scCurveInfo').style.display = 'block';
+  document.getElementById('scEquation').textContent = batch.curve.equation;
+  document.getElementById('scSlope').textContent = batch.curve.slope.toFixed(6);
+  document.getElementById('scIntercept').textContent = batch.curve.intercept.toFixed(6);
+  document.getElementById('scR2').textContent = batch.curve.rSquared.toFixed(6);
+  document.getElementById('scRange').textContent = `${batch.linearRange.minConc.toFixed(2)} ~ ${batch.linearRange.maxConc.toFixed(2)}`;
+
+  const stdPoints = batch.standards.map(s => ({ x: s.concentration, y: s.response }));
+  scChart.data.datasets[0].data = stdPoints;
+  scChart.data.datasets[1].data = batch.curvePoints;
+
+  const unkPoints = batch.unknowns
+    .filter(u => u.concentration !== null)
+    .map(u => ({ x: u.concentration, y: u.response }));
+  scChart.data.datasets[2].data = unkPoints;
+  scChart.update();
+
+  const resultsWrapper = document.getElementById('scResultsWrapper');
+  const inRangeCount = batch.unknowns.filter(u => u.inRange).length;
+  const outRangeCount = batch.unknowns.filter(u => u.concentration !== null && !u.inRange).length;
+
+  let html = `
+    <div style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;">
+      <span class="range-badge in-range">在线性范围内: ${inRangeCount} 个</span>
+      <span class="range-badge out-range">超出线性范围: ${outRangeCount} 个</span>
+    </div>
+    <table class="sc-results-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>样本名</th>
+          <th>响应值</th>
+          <th>计算浓度</th>
+          <th>范围判定</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  batch.unknowns.forEach((u, i) => {
+    let concDisplay, rangeDisplay;
+    if (u.error) {
+      concDisplay = `<span class="conc-error">${u.error}</span>`;
+      rangeDisplay = `<span class="range-badge out-range">无效</span>`;
+    } else {
+      const concClass = u.inRange ? 'conc-in-range' : 'conc-out-range';
+      concDisplay = `<span class="${concClass}">${u.concentration.toFixed(4)}</span>`;
+      rangeDisplay = u.inRange
+        ? `<span class="range-badge in-range">范围内</span>`
+        : `<span class="range-badge out-range">超范围</span>`;
+    }
+    html += `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${u.name}</td>
+        <td>${isNaN(u.response) ? '—' : u.response.toFixed(4)}</td>
+        <td>${concDisplay}</td>
+        <td>${rangeDisplay}</td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  resultsWrapper.innerHTML = html;
+}
+
+async function loadScBatches() {
+  try {
+    const res = await fetch('/api/standard-curve/batches');
+    const batches = await res.json();
+    const listEl = document.getElementById('scBatchList');
+
+    if (batches.length === 0) {
+      listEl.innerHTML = '<div class="empty-state">暂无定量批次记录</div>';
+      return;
+    }
+
+    listEl.innerHTML = batches.map(b => `
+      <div class="batch-item" data-id="${b.id}">
+        <div class="batch-name">${b.batchName}</div>
+        <div class="batch-equation">${b.equation}</div>
+        <div class="batch-meta">
+          <span>${b.standardsCount} 标准品 · ${b.unknownsCount} 样本</span>
+          <span class="batch-r2">R²=${b.rSquared.toFixed(4)}</span>
+        </div>
+        <div class="batch-meta">
+          <span>${new Date(b.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+        <div class="history-actions">
+          <button class="btn-load" onclick="loadScBatch('${b.id}')">查看</button>
+          <button class="btn-delete" onclick="deleteScBatch('${b.id}')">删除</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('加载批次列表失败:', err);
+  }
+}
+
+async function loadScBatch(id) {
+  try {
+    const res = await fetch(`/api/standard-curve/batches/${id}`);
+    const batch = await res.json();
+    if (!res.ok) throw new Error(batch.error);
+
+    document.getElementById('scBatchName').value = batch.batchName;
+
+    const stdTbody = document.getElementById('stdTableBody');
+    stdTbody.innerHTML = '';
+    batch.standards.forEach(s => addStdRow(s.concentration, s.response));
+
+    const unkTbody = document.getElementById('unkTableBody');
+    unkTbody.innerHTML = '';
+    batch.unknowns.forEach(u => addUnkRow(u.name, u.response));
+
+    displayScResult(batch);
+    showToast('已加载批次记录', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function deleteScBatch(id) {
+  if (!confirm('确定删除这个批次记录吗？')) return;
+  try {
+    const res = await fetch(`/api/standard-curve/batches/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('删除失败');
+    showToast('已删除批次', 'success');
+    loadScBatches();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function initScEventListeners() {
+  document.getElementById('addStdRowBtn').addEventListener('click', () => addStdRow());
+  document.getElementById('clearStdBtn').addEventListener('click', () => {
+    const tbody = document.getElementById('stdTableBody');
+    tbody.innerHTML = '';
+    for (let i = 0; i < 5; i++) addStdRow();
+  });
+  document.getElementById('loadStdSampleBtn').addEventListener('click', loadStdSampleData);
+
+  document.getElementById('addUnkRowBtn').addEventListener('click', () => addUnkRow());
+  document.getElementById('clearUnkBtn').addEventListener('click', () => {
+    const tbody = document.getElementById('unkTableBody');
+    tbody.innerHTML = '';
+    for (let i = 0; i < 3; i++) addUnkRow();
+  });
+
+  document.getElementById('calcConcBtn').addEventListener('click', calculateConcentrations);
+}
+
+function initScDefaults() {
+  const stdTbody = document.getElementById('stdTableBody');
+  for (let i = 0; i < 5; i++) addStdRow();
+
+  const unkTbody = document.getElementById('unkTableBody');
+  for (let i = 0; i < 3; i++) addUnkRow();
+}
+
 function init() {
   initCharts();
   initTabs();
   initEventListeners();
+  initPageNav();
+  initScEventListeners();
+  initScDefaults();
   clearDataTable();
   loadHistory();
   loadDatasets();
+  loadScBatches();
   updateDatasetButtons();
 }
 

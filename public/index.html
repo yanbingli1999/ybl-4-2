@@ -11,7 +11,10 @@
   <div class="app-container">
     <header class="app-header">
       <h1>📈 实验曲线拟合台</h1>
-      <p class="subtitle">科学计算工具 · 支持线性/指数/二次曲线拟合</p>
+      <nav class="page-nav">
+        <button class="nav-btn active" data-page="fitting">曲线拟合</button>
+        <button class="nav-btn" data-page="quantification">标准曲线定量</button>
+      </nav>
     </header>
 
     <div class="main-layout">
@@ -148,6 +151,119 @@
             <div id="datasetsList" class="datasets-list">
               <div class="empty-state">暂无保存的数据集</div>
             </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="main-layout quantification-page" id="quantificationPage" style="display:none;">
+      <aside class="sidebar left-panel">
+        <div class="panel-section">
+          <h2>🧪 标准品录入</h2>
+          <div class="dataset-controls">
+            <input type="text" id="scBatchName" placeholder="批次名称" value="定量批次">
+          </div>
+          <div class="table-toolbar">
+            <button id="addStdRowBtn" class="btn btn-primary">➕ 添加标准品</button>
+            <button id="clearStdBtn" class="btn btn-secondary">🗑 清空</button>
+            <button id="loadStdSampleBtn" class="btn btn-info">📚 示例</button>
+          </div>
+          <div class="data-table-wrapper">
+            <table id="stdTable" class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:40px">#</th>
+                  <th>浓度</th>
+                  <th>响应值</th>
+                  <th style="width:60px">操作</th>
+                </tr>
+              </thead>
+              <tbody id="stdTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h2>🔬 未知样本录入</h2>
+          <div class="table-toolbar">
+            <button id="addUnkRowBtn" class="btn btn-primary">➕ 添加样本</button>
+            <button id="clearUnkBtn" class="btn btn-secondary">🗑 清空</button>
+          </div>
+          <div class="data-table-wrapper">
+            <table id="unkTable" class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:40px">#</th>
+                  <th>样本名</th>
+                  <th>响应值</th>
+                  <th style="width:60px">操作</th>
+                </tr>
+              </thead>
+              <tbody id="unkTableBody"></tbody>
+            </table>
+          </div>
+          <button id="calcConcBtn" class="btn btn-success btn-large">🚀 计算浓度</button>
+        </div>
+      </aside>
+
+      <main class="center-panel">
+        <div class="charts-container" style="grid-template-rows:1fr 1fr;">
+          <div class="chart-section">
+            <div class="chart-header">
+              <h2>📊 标准曲线</h2>
+              <div class="legend-info">
+                <span class="legend-item"><span class="legend-color" style="background:#10b981"></span>标准品</span>
+                <span class="legend-item"><span class="legend-color" style="background:#ef4444"></span>拟合直线</span>
+                <span class="legend-item"><span class="legend-color" style="background:#3b82f6"></span>未知样本</span>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="scChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-section">
+            <div class="chart-header">
+              <h2>📋 样本定量结果</h2>
+            </div>
+            <div class="sc-results-wrapper" id="scResultsWrapper">
+              <div class="empty-state">请先录入标准品和未知样本，点击"计算浓度"</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section" id="scCurveInfo" style="display:none;">
+          <h2>📐 曲线参数</h2>
+          <div class="metrics-panel">
+            <div class="metric-item">
+              <span class="metric-label">拟合方程</span>
+              <span class="metric-value" id="scEquation">—</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">斜率 (Slope)</span>
+              <span class="metric-value" id="scSlope">—</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">截距 (Intercept)</span>
+              <span class="metric-value" id="scIntercept">—</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">R² 决定系数</span>
+              <span class="metric-value" id="scR2">—</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">线性范围</span>
+              <span class="metric-value" id="scRange">—</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <aside class="sidebar right-panel">
+        <div class="panel-section">
+          <h2>📦 批次历史</h2>
+          <div id="scBatchList" class="history-list">
+            <div class="empty-state">暂无定量批次记录</div>
           </div>
         </div>
       </aside>

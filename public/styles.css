@@ -641,3 +641,149 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+.page-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.nav-btn {
+  padding: 8px 24px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.nav-btn:hover {
+  background: #e2e8f0;
+}
+
+.nav-btn.active {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.sc-results-wrapper {
+  overflow-y: auto;
+  max-height: 100%;
+  flex: 1;
+}
+
+.sc-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sc-results-table thead {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  z-index: 1;
+}
+
+.sc-results-table th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.sc-results-table td {
+  padding: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sc-results-table tr:hover {
+  background: #f8fafc;
+}
+
+.conc-in-range {
+  color: #059669;
+  font-weight: 600;
+}
+
+.conc-out-range {
+  color: #d97706;
+  font-weight: 600;
+}
+
+.conc-error {
+  color: #dc2626;
+  font-style: italic;
+}
+
+.range-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.range-badge.in-range {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.range-badge.out-range {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.batch-item {
+  padding: 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.batch-item:hover {
+  border-color: #10b981;
+  background: #f8fafc;
+  transform: translateX(2px);
+}
+
+.batch-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.batch-meta {
+  font-size: 11px;
+  color: #94a3b8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.batch-equation {
+  font-size: 11px;
+  color: #64748b;
+  font-family: 'Cambria Math', 'Consolas', monospace;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.batch-r2 {
+  font-size: 11px;
+  color: #10b981;
+  font-weight: 600;
+}

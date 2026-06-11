@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DATASETS_FILE = path.join(DATA_DIR, 'datasets.json');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+const BATCHES_FILE = path.join(DATA_DIR, 'batches.json');
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -24,6 +25,9 @@ function ensureDataFiles() {
   }
   if (!fs.existsSync(HISTORY_FILE)) {
     fs.writeFileSync(HISTORY_FILE, JSON.stringify([], null, 2));
+  }
+  if (!fs.existsSync(BATCHES_FILE)) {
+    fs.writeFileSync(BATCHES_FILE, JSON.stringify([], null, 2));
   }
 }
 ensureDataFiles();
@@ -317,6 +321,104 @@ app.delete('/api/history/:id', (req, res) => {
     return res.status(404).json({ error: '记录不存在' });
   }
   writeJsonFile(HISTORY_FILE, history);
+  res.json({ success: true });
+});
+
+app.post('/api/standard-curve/calculate', (req, res) => {
+  const { standards, unknowns, batchName } = req.body;
+  if (!standards || !Array.isArray(standards) || standards.length < 2) {
+    return res.status(400).json({ error: '至少需要2个标准品数据点' });
+  }
+  if (!unknowns || !Array.isArray(unknowns) || unknowns.length === 0) {
+    return res.status(400).json({ error: '请录入至少1个未知样本' });
+  }
+
+  const validStandards = standards.filter(s => !isNaN(s.concentration) && !isNaN(s.response));
+  if (validStandards.length < 2) {
+    return res.status(400).json({ error: '标准品有效数据点不足2个' });
+  }
+
+  const points = validStandards.map(s => ({ x: s.concentration, y: s.response }));
+  const { a: slope, b: intercept } = linearRegression(points);
+
+  const n = points.length;
+  let yMean = 0;
+  points.forEach(p => yMean += p.y);
+  yMean /= n;
+  let ssTotal = 0, ssResidual = 0;
+  points.forEach(p => {
+    const predicted = slope * p.x + intercept;
+    ssResidual += (p.y - predicted) ** 2;
+    ssTotal += (p.y - yMean) ** 2;
+  });
+  const rSquared = 1 - (ssResidual / ssTotal);
+
+  const minConc = Math.min(...points.map(p => p.x));
+  const maxConc = Math.max(...points.map(p => p.x));
+
+  const calculatedUnknowns = unknowns.map(u => {
+    if (isNaN(u.response) || slope === 0) {
+      return { ...u, concentration: null, inRange: false, error: slope === 0 ? '斜率为零' : '响应值无效' };
+    }
+    const conc = (u.response - intercept) / slope;
+    const inRange = conc >= minConc && conc <= maxConc;
+    return { ...u, concentration: conc, inRange, error: null };
+  });
+
+  const curvePoints = generateCurvePoints(points, 'linear', { a: slope, b: intercept }, 100);
+
+  const batch = {
+    id: generateId(),
+    batchName: batchName || '未命名批次',
+    standards: validStandards,
+    unknowns: calculatedUnknowns,
+    curve: { slope, intercept, rSquared, equation: `y = ${slope.toFixed(6)}x + ${intercept.toFixed(6)}` },
+    linearRange: { minConc, maxConc },
+    curvePoints,
+    createdAt: new Date().toISOString()
+  };
+
+  const batches = readJsonFile(BATCHES_FILE);
+  batches.unshift(batch);
+  if (batches.length > 100) batches.length = 100;
+  writeJsonFile(BATCHES_FILE, batches);
+
+  res.json(batch);
+});
+
+app.get('/api/standard-curve/batches', (req, res) => {
+  const batches = readJsonFile(BATCHES_FILE);
+  const summaries = batches.map(b => ({
+    id: b.id,
+    batchName: b.batchName,
+    standardsCount: b.standards.length,
+    unknownsCount: b.unknowns.length,
+    rSquared: b.curve.rSquared,
+    equation: b.curve.equation,
+    createdAt: b.createdAt
+  }));
+  res.json(summaries);
+});
+
+app.get('/api/standard-curve/batches/:id', (req, res) => {
+  const { id } = req.params;
+  const batches = readJsonFile(BATCHES_FILE);
+  const batch = batches.find(b => b.id === id);
+  if (!batch) {
+    return res.status(404).json({ error: '批次不存在' });
+  }
+  res.json(batch);
+});
+
+app.delete('/api/standard-curve/batches/:id', (req, res) => {
+  const { id } = req.params;
+  let batches = readJsonFile(BATCHES_FILE);
+  const initialLength = batches.length;
+  batches = batches.filter(b => b.id !== id);
+  if (batches.length === initialLength) {
+    return res.status(404).json({ error: '批次不存在' });
+  }
+  writeJsonFile(BATCHES_FILE, batches);
   res.json({ success: true });
 });
 
