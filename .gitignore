@@ -20,15 +20,19 @@ pnpm-debug.log*
 
 # Caches
 .cache/
+*.cache
 .parcel-cache/
 .vite/
 .next/
 .nuxt/
 .turbo/
+.npm/
+.yarn/
 .eslintcache
 .stylelintcache
 tmp/
 temp/
+*.tmp
 
 # Archives
 *.zip
